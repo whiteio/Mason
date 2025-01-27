@@ -6,67 +6,54 @@
 //
 
 import Foundation
+import Algorithms
+import os
 
 final class BuildSystem {
     private let config: BuildConfig
     private let fileManager: FileManager
+    private let simulatorManager: SimulatorManager
+    private let dependencyGraph: DependencyGraph
 
-    init(config: BuildConfig, fileManager: FileManager = .default) {
+    init(
+        config: BuildConfig,
+        fileManager: FileManager = .default,
+        simulatorManager: SimulatorManager,
+        dependencyGraph: DependencyGraph
+    ) {
         self.config = config
         self.fileManager = fileManager
+        self.simulatorManager = simulatorManager
+        self.dependencyGraph = dependencyGraph
     }
 
     func build() async throws {
         try prepareDirectories()
-        try await compileSwiftFiles()
+
+        let buildOrder = resolveBuildOrder()
+
+        for moduleName in buildOrder {
+            try await buildModule(moduleName)
+        }
+
+        try await compileAndLink()
+
         try createAppBundle()
         try processResources()
 
-        print("Successfully built \(config.appName).app")
-        print("App location: \(config.buildDir)/\(config.appName).app")
+        os_log("Successfully built \(self.config.appName).app")
+        os_log("App location: \(self.config.buildDir)/\(self.config.appName).app")
 
-        // Install directly from .app bundle
-        try installApp()
+        try simulatorManager.install(config)
     }
 
-    private func installApp() throws {
-        // Install app
-        let install = Process()
-        install.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-        install.arguments = [
-            "simctl",
-            "install",
-            "booted",
-            "\(config.buildDir)/\(config.appName).app",
-        ]
-
-        try install.run()
-        install.waitUntilExit()
-
-        if install.terminationStatus != 0 {
-            throw BuildError.installationFailed("Failed to install app to simulator")
+    private func resolveBuildOrder() -> UniquedSequence<[String], String> {
+        var buildOrder: [String] = []
+        for moduleName in dependencyGraph.adjacencyList.keys {
+            let dependencies = dependencyGraph.resolveDependencies(for: moduleName)
+            buildOrder.append(contentsOf: dependencies)
         }
-
-        print("Successfully installed app to simulator")
-
-        // Launch app
-        let launch = Process()
-        launch.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-        launch.arguments = [
-            "simctl",
-            "launch",
-            "booted",
-            config.bundleId,
-        ]
-
-        try launch.run()
-        launch.waitUntilExit()
-
-        if launch.terminationStatus == 0 {
-            print("Successfully launched app in simulator")
-        } else {
-            throw BuildError.launchFailed("Failed to launch app in simulator")
-        }
+        return buildOrder.uniqued()
     }
 
     private func prepareDirectories() throws {
@@ -77,99 +64,18 @@ final class BuildSystem {
         try fileManager.createDirectory(atPath: config.ipaDir, withIntermediateDirectories: true)
     }
 
-    private func compileSwiftFiles() async throws {
-        let sources = try findSwiftFiles()
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/swiftc")
-
-        // Add paths for Swift runtime libraries
-        let simulatorLibPath = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator"
-        let swiftLibPath = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift"
-
-        var args = [
-            "-sdk", config.sdkPath,
-            "-target", "\(config.simulatorArch)-apple-ios\(config.deploymentTarget)-simulator",
-            "-emit-executable",
-            "-o", "\(config.buildDir)/\(config.appName)",
-            // Add Swift library search paths
-            "-L", simulatorLibPath,
-            "-L", swiftLibPath,
-            // Runtime search paths
-            "-Xlinker", "-rpath", "-Xlinker", "@executable_path/Frameworks",
-            "-Xlinker", "-rpath", "-Xlinker", simulatorLibPath,
-            // Framework paths
-            "-F", "\(config.sdkPath)/System/Library/Frameworks",
-            // Required frameworks
-            "-framework", "SwiftUI",
-            "-framework", "Foundation",
-            "-framework", "UIKit",
-            "-framework", "CoreGraphics",
-            "-framework", "CoreServices",
-            // Swift settings
-            "-swift-version", "5",
-            // Additional linker flags
-            "-Xlinker", "-no_objc_category_merging",
-        ]
-        args += sources
-
-        let pipe = Pipe()
-        process.standardError = pipe
-        process.standardOutput = pipe
-        process.arguments = args
-
-        print("Compiling with arguments: \(args.joined(separator: " "))")
-
-        try process.run()
-        process.waitUntilExit()
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        if let output = String(data: data, encoding: .utf8) {
-            print("Compiler output:\n\(output)")
-        }
-
-        if process.terminationStatus != 0 {
-            throw BuildError.compilationFailed(String(data: data, encoding: .utf8) ?? "Unknown error")
-        }
-    }
-
-    private func findSwiftFiles() throws -> [String] {
-        let enumerator = fileManager.enumerator(
-            at: URL(fileURLWithPath: config.sourceDir),
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        )
-
-        var swiftFiles: [String] = []
-
-        while let url = enumerator?.nextObject() as? URL {
-            if url.pathExtension == "swift" {
-                swiftFiles.append(url.path)
-            }
-        }
-
-        guard !swiftFiles.isEmpty else {
-            throw BuildError.compilationFailed("No Swift files found in \(config.sourceDir)")
-        }
-
-        return swiftFiles
-    }
-
     private func createAppBundle() throws {
         let appBundlePath = "\(config.buildDir)/\(config.appName).app"
         try? fileManager.removeItem(atPath: appBundlePath)
         try fileManager.createDirectory(atPath: appBundlePath, withIntermediateDirectories: true)
 
-        // Copy executable
         try fileManager.moveItem(
             atPath: "\(config.buildDir)/\(config.appName)",
             toPath: "\(appBundlePath)/\(config.appName)"
         )
 
-        // Make sure permissions are correct
         try setExecutablePermissions(atPath: "\(appBundlePath)/\(config.appName)")
 
-        // Sign the bundle
         try signApp(at: appBundlePath)
     }
 
@@ -178,7 +84,7 @@ final class BuildSystem {
         process.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
         process.arguments = [
             "--force",
-            "--sign", "-", // Ad-hoc signing
+            "--sign", "-",
             "--preserve-metadata=identifier,entitlements,flags",
             "--generate-entitlement-der",
             path,
@@ -253,36 +159,248 @@ final class BuildSystem {
         try infoPlist.write(toFile: path, atomically: true, encoding: .utf8)
     }
 
-    private func createIPA() throws {
-        let payloadPath = "\(config.ipaDir)/Payload"
-        try? fileManager.removeItem(atPath: payloadPath)
-        try fileManager.createDirectory(atPath: payloadPath, withIntermediateDirectories: true)
-
-        try fileManager.copyItem(
-            atPath: "\(config.buildDir)/\(config.appName).app",
-            toPath: "\(payloadPath)/\(config.appName).app"
-        )
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
-        process.currentDirectoryURL = URL(fileURLWithPath: config.ipaDir)
-        process.arguments = ["-r", "\(config.appName).ipa", "Payload"]
-
-        try process.run()
-        process.waitUntilExit()
-
-        if process.terminationStatus != 0 {
-            throw BuildError.ipaCreationFailed("Failed to create IPA")
-        }
-
-        try? fileManager.removeItem(atPath: payloadPath)
-    }
-
     private func setExecutablePermissions(atPath path: String) throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/chmod")
         process.arguments = ["755", path]
         try process.run()
         process.waitUntilExit()
+    }
+}
+
+extension BuildSystem {
+    private func findSwiftFiles(in directory: String) throws -> [String] {
+        os_log("Finding swift files in directory: \(directory)")
+        
+        let url = URL(fileURLWithPath: directory)
+        let enumerator = fileManager.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        )
+
+        var swiftFiles: [String] = []
+
+        while let fileURL = enumerator?.nextObject() as? URL {
+            if fileURL.pathExtension == "swift" {
+                swiftFiles.append(fileURL.path)
+            }
+        }
+
+        os_log("Found Swift files: \(swiftFiles)")
+
+        guard !swiftFiles.isEmpty else {
+            throw BuildError.compilationFailed("No Swift files found in \(directory)")
+        }
+
+        return swiftFiles
+    }
+}
+
+extension BuildSystem {
+    private func buildModule(_ moduleName: String) async throws {
+        let absoluteSourceDir = URL(fileURLWithPath: config.sourceDir).standardizedFileURL.path
+        let absoluteBuildDir = URL(fileURLWithPath: config.buildDir).standardizedFileURL.path
+        
+        let modulePath = "\(absoluteSourceDir)/\(moduleName)/Sources"
+        let moduleBuildPath = "\(absoluteBuildDir)/\(moduleName)"
+
+        os_log("Building module at path: \(modulePath)")
+        os_log("Module build path: \(moduleBuildPath)")
+        
+        try fileManager.createDirectory(atPath: moduleBuildPath, withIntermediateDirectories: true)
+
+        let sources = try findSwiftFiles(in: modulePath)
+        os_log("Found source files: \(sources)")
+
+        let outputFileMap = try createOutputFileMap(sources: sources, buildPath: moduleBuildPath)
+        let outputFileMapPath = "\(moduleBuildPath)/output-file-map.json"
+        try outputFileMap.write(toFile: outputFileMapPath, atomically: true, encoding: .utf8)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/swiftc")
+
+        // Set the current directory to the build path
+        process.currentDirectoryURL = URL(fileURLWithPath: moduleBuildPath)
+
+        var args = [
+            "-sdk", config.sdkPath,
+            "-target", "\(config.simulatorArch)-apple-ios\(config.deploymentTarget)-simulator",
+            "-emit-module",
+            "-emit-module-path", ".",
+            "-emit-dependencies",
+            "-emit-objc-header",
+            "-emit-objc-header-path", "\(moduleName).h",
+            "-module-name", moduleName,
+            "-output-file-map", "output-file-map.json",
+            "-parse-as-library",
+            "-c",
+            "-swift-version", "5",
+            "-whole-module-optimization",
+        ]
+
+        let dependencies = dependencyGraph.adjacencyList[moduleName] ?? []
+        for dependency in dependencies {
+            args += ["-I", "\(absoluteBuildDir)/\(dependency)"]
+        }
+
+        args += sources
+
+        let pipe = Pipe()
+        process.standardError = pipe
+        process.standardOutput = pipe
+        process.arguments = args
+
+        let fullCommand = (["/usr/bin/swiftc"] + args).joined(separator: " ")
+        os_log("\nExecuting compiler command:\n\(fullCommand)\n")
+
+        try process.run()
+        process.waitUntilExit()
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        if let output = String(data: data, encoding: .utf8) {
+            os_log("Compiler output for \(moduleName):\n\(output)")
+        }
+
+        if process.terminationStatus != 0 {
+            throw BuildError.compilationFailed("Failed to build module \(moduleName)")
+        }
+    }
+
+    private func createOutputFileMap(sources: [String], buildPath: String) throws -> String {
+        // With WMO, we only need the special empty key for whole-module outputs
+        let map: [String: [String: String]] = [
+            "": [
+                "object": "\(URL(fileURLWithPath: buildPath).lastPathComponent).o",
+                "swift-dependencies": "module.swiftdeps"
+            ]
+        ]
+        
+        let jsonData = try JSONSerialization.data(withJSONObject: map, options: .prettyPrinted)
+        let str = String(data: jsonData, encoding: .utf8)!
+        os_log("Output file map:\n\(str)")
+        return str
+    }
+    
+    private func compileAndLink() async throws {
+        let mainSources = try findSwiftFiles(in: "\(config.sourceDir)/Sources")
+        
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/swiftc")
+        
+        let simulatorLibPath = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator"
+        let swiftLibPath = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift"
+        
+        var args = [
+            "-sdk", config.sdkPath,
+            "-target", "\(config.simulatorArch)-apple-ios\(config.deploymentTarget)-simulator",
+            "-emit-executable",
+            "-o", "\(config.buildDir)/\(config.appName)",
+            "-L", simulatorLibPath,
+            "-L", swiftLibPath,
+            "-Xlinker", "-rpath", "-Xlinker", "@executable_path/Frameworks",
+            "-Xlinker", "-rpath", "-Xlinker", simulatorLibPath,
+            "-F", "\(config.sdkPath)/System/Library/Frameworks",
+            "-framework", "SwiftUI",
+            "-framework", "Foundation",
+            "-framework", "UIKit",
+            "-framework", "CoreGraphics",
+            "-framework", "CoreServices",
+            "-swift-version", "5",
+            "-Xlinker", "-no_objc_category_merging",
+        ]
+        
+        let buildOrder = resolveBuildOrder()
+        for moduleName in buildOrder {
+            args += ["-I", "\(config.buildDir)/\(moduleName)"]
+            let objectPath = "\(config.buildDir)/\(moduleName)/\(moduleName).o"
+            if FileManager.default.fileExists(atPath: objectPath) {
+                args += [objectPath]
+            } else {
+                throw BuildError.compilationFailed("Object file not found at path: \(objectPath)")
+            }
+        }
+        
+        args += mainSources
+        
+        let pipe = Pipe()
+        process.standardError = pipe
+        process.standardOutput = pipe
+        process.arguments = args
+        
+        os_log("Compiling and linking with arguments: \(args.joined(separator: " "))")
+        
+        try process.run()
+        process.waitUntilExit()
+        
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        if let output = String(data: data, encoding: .utf8) {
+            os_log("Compiler output:\n\(output)")
+        }
+        
+        if process.terminationStatus != 0 {
+            throw BuildError.compilationFailed(String(data: data, encoding: .utf8) ?? "Unknown error")
+        }
+    }
+
+    private func linkModules() async throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/swiftc")
+
+        var args = [
+            "-sdk", config.sdkPath,
+            "-target", "\(config.simulatorArch)-apple-ios\(config.deploymentTarget)-simulator",
+            "-emit-executable",
+            "-o", "\(config.buildDir)/\(config.appName)",
+            "-L", "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator",
+            "-Xlinker", "-rpath", "-Xlinker", "@executable_path/Frameworks",
+            "-F", "\(config.sdkPath)/System/Library/Frameworks",
+            "-framework", "SwiftUI",
+            "-framework", "Foundation",
+            "-framework", "UIKit",
+            "-framework", "CoreGraphics",
+            "-framework", "CoreServices",
+            "-swift-version", "5",
+            "-Xlinker", "-no_objc_category_merging",
+        ]
+
+        for moduleName in dependencyGraph.adjacencyList.keys {
+            let moduleBuildPath = "\(config.buildDir)/\(moduleName)"
+            args += ["-I", moduleBuildPath]
+        }
+        
+        let allModules = dependencyGraph.adjacencyList.keys.map { moduleName -> String in
+            let dependencies = dependencyGraph.resolveDependencies(for: moduleName)
+            return dependencies.joined(separator: " ")
+        }.joined(separator: " ").split(separator: " ").map(String.init)
+        
+        for moduleName in allModules {
+            let moduleBuildPath = "\(config.buildDir)/\(moduleName)"
+            let objectPath = "\(moduleBuildPath)/\(moduleName).o"
+            if FileManager.default.fileExists(atPath: objectPath) {
+                args += [objectPath]
+            } else {
+                throw BuildError.compilationFailed("Object file not found at path: \(objectPath)")
+            }
+        }
+
+        let pipe = Pipe()
+        process.standardError = pipe
+        process.standardOutput = pipe
+        process.arguments = args
+
+        os_log("Linking modules with arguments: \(args.joined(separator: " "))")
+
+        try process.run()
+        process.waitUntilExit()
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        if let output = String(data: data, encoding: .utf8) {
+            os_log("Linker output:\n\(output)")
+        }
+
+        if process.terminationStatus != 0 {
+            throw BuildError.compilationFailed("Failed to link modules")
+        }
     }
 }
