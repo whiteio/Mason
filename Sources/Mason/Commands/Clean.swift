@@ -14,29 +14,29 @@ struct Clean: ParsableCommand {
         commandName: "clean",
         abstract: "Remove build artifacts"
     )
-    
+
     @Argument(help: "The target to clean (path to project directory)")
     var target: String
-    
+
     func validate() throws {
         let url = URL(fileURLWithPath: target)
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw ValidationError("The specified target directory does not exist: \(url.path)")
         }
     }
-    
+
     func run() throws {
         BuildLogger.info("Cleaning build artifacts from \(target)")
-        
+
         // Parse app config to get build directories
         let appConfig = try parseAppConfig()
-        
+
         let dirsToClean = [
             "\(target)/\(Constants.buildDir)",
         ]
-        
+
         let fileManager = FileManager.default
-        
+
         for dir in dirsToClean {
             if fileManager.fileExists(atPath: dir) {
                 do {
@@ -49,7 +49,7 @@ struct Clean: ParsableCommand {
                 BuildLogger.debug("Directory already clean: \(dir)")
             }
         }
-        
+
         for moduleName in appConfig.modules {
             let modulePath = "\(target)/\(moduleName)"
             if fileManager.fileExists(atPath: modulePath) {
@@ -67,10 +67,10 @@ struct Clean: ParsableCommand {
                 }
             }
         }
-        
+
         BuildLogger.info("Clean completed")
     }
-    
+
     private func parseAppConfig() throws -> AppConfig {
         let appConfigPath = "\(target)/app.yml"
         let appConfigContent = try String(contentsOfFile: appConfigPath, encoding: .utf8)

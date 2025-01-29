@@ -5,11 +5,11 @@
 //  Created by Chris White on 1/29/25.
 //
 
-import Yams
 import ArgumentParser
 import Foundation
+import Yams
 
-struct Constants {
+enum Constants {
     static let buildDir: String = ".build"
 }
 
@@ -18,23 +18,23 @@ struct Build: ParsableCommand {
         commandName: "build",
         abstract: "Build the specified target and install it to the simulator"
     )
-    
+
     @Argument(help: "The target to build (path to project directory)")
     var target: String
-        
+
     func validate() throws {
         let url = URL(fileURLWithPath: target)
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw ValidationError("The specified target directory does not exist: \(url.path)")
         }
     }
-    
+
     func run() throws {
         let group = DispatchGroup()
         group.enter()
-        
+
         var asyncError: Error?
-        
+
         Task {
             do {
                 BuildLogger.debug("Parsing configuration and building dependency graph...")
@@ -45,7 +45,7 @@ struct Build: ParsableCommand {
                 BuildLogger.debug("Modules: \(appConfig.modules)")
 
                 let dependencyGraph = try buildDependencyGraph(appConfig: appConfig)
-                
+
                 let buildConfig = BuildConfig(
                     appName: appConfig.appName,
                     bundleId: appConfig.bundleId,
@@ -56,7 +56,7 @@ struct Build: ParsableCommand {
                 )
 
                 let simulatorManager = SimulatorManager()
-                
+
                 let buildSystem = BuildSystem(
                     config: buildConfig,
                     simulatorManager: simulatorManager,
@@ -66,21 +66,21 @@ struct Build: ParsableCommand {
                 BuildLogger.info("Starting build process...")
                 try await buildSystem.build()
                 BuildLogger.info("Build completed successfully!")
-                
+
             } catch {
                 asyncError = error
             }
-            
+
             group.leave()
         }
-        
+
         group.wait()
-        
+
         if let error = asyncError {
             throw error
         }
     }
-    
+
     private func parseAppConfig() throws -> AppConfig {
         let appConfigPath = "\(target)/app.yml"
         let appConfigContent = try String(contentsOfFile: appConfigPath, encoding: .utf8)

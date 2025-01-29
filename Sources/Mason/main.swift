@@ -10,10 +10,10 @@ struct Mason: ParsableCommand {
         subcommands: [Build.self, Clean.self],
         defaultSubcommand: Build.self
     )
-    
+
     @Flag(name: .shortAndLong, help: "Enable verbose output")
     var verbose = false
-    
+
     mutating func validate() throws {
         BuildLogger.configure(logToConsole: verbose)
     }
