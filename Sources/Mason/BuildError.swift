@@ -6,8 +6,8 @@
 //
 
 enum BuildError: Error {
-    case compilationFailed(String)
-    case signingFailed(String)
-    case launchFailed(String)
-    case installationFailed(String)
+  case compilationFailed(String)
+  case signingFailed(String)
+  case launchFailed(String)
+  case installationFailed(String)
 }

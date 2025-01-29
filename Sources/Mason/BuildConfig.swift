@@ -8,22 +8,22 @@
 import Foundation
 
 struct BuildConfig {
-    let appName: String
-    let bundleId: String
-    let sourceDir: String
-    let buildDir: String
-    let resourcesDir: String
-    let deploymentTarget: String
+  let appName: String
+  let bundleId: String
+  let sourceDir: String
+  let buildDir: String
+  let resourcesDir: String
+  let deploymentTarget: String
 
-    var sdkPath: String {
-        "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk"
-    }
+  var sdkPath: String {
+    "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk"
+  }
 
-    var simulatorArch: String {
-        #if arch(arm64)
-            return "arm64"
-        #else
-            return "x86_64"
-        #endif
-    }
+  var simulatorArch: String {
+    #if arch(arm64)
+    return "arm64"
+    #else
+    return "x86_64"
+    #endif
+  }
 }

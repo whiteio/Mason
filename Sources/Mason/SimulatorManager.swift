@@ -8,64 +8,70 @@
 import Foundation
 
 class SimulatorManager {
-    private func runSimCtlCommand(_ arguments: [String]) throws -> (status: Int32, output: String) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-        process.arguments = ["simctl"] + arguments
 
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
+  // MARK: Internal
 
-        try process.run()
-        process.waitUntilExit()
+  func install(_ config: BuildConfig) throws {
+    // First terminate any existing instances
+    try terminateApp(config.bundleId)
 
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8) ?? ""
+    // Install app
+    BuildLogger.debug("Installing \(config.appName).app...")
+    let (installStatus, installOutput) = try runSimCtlCommand([
+      "install",
+      "booted",
+      "\(config.buildDir)/\(config.appName).app",
+    ])
 
-        return (process.terminationStatus, output)
+    if installStatus != 0 {
+      throw BuildError.installationFailed("Failed to install app: \(installOutput)")
     }
 
-    private func terminateApp(_ bundleId: String) throws {
-        BuildLogger.debug("Terminating any existing instances of \(bundleId)...")
-        let (status, output) = try runSimCtlCommand(["terminate", "booted", bundleId])
+    BuildLogger.debug("Successfully installed app to simulator")
 
-        // Status 146 means app wasn't running, which is fine
-        if status != 0, status != 146 {
-            BuildLogger.warning("Warning: Failed to terminate app: \(output)")
-        }
+    // Launch app
+    BuildLogger.info("Launching \(config.bundleId)...")
+    let (launchStatus, launchOutput) = try runSimCtlCommand([
+      "launch",
+      "booted",
+      config.bundleId,
+    ])
+
+    if launchStatus != 0 {
+      throw BuildError.launchFailed("Failed to launch app: \(launchOutput)")
     }
 
-    func install(_ config: BuildConfig) throws {
-        // First terminate any existing instances
-        try terminateApp(config.bundleId)
+    BuildLogger.info("Successfully launched app in simulator")
+  }
 
-        // Install app
-        BuildLogger.debug("Installing \(config.appName).app...")
-        let (installStatus, installOutput) = try runSimCtlCommand([
-            "install",
-            "booted",
-            "\(config.buildDir)/\(config.appName).app",
-        ])
+  // MARK: Private
 
-        if installStatus != 0 {
-            throw BuildError.installationFailed("Failed to install app: \(installOutput)")
-        }
+  private func runSimCtlCommand(_ arguments: [String]) throws -> (status: Int32, output: String) {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+    process.arguments = ["simctl"] + arguments
 
-        BuildLogger.debug("Successfully installed app to simulator")
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    process.standardError = pipe
 
-        // Launch app
-        BuildLogger.info("Launching \(config.bundleId)...")
-        let (launchStatus, launchOutput) = try runSimCtlCommand([
-            "launch",
-            "booted",
-            config.bundleId,
-        ])
+    try process.run()
+    process.waitUntilExit()
 
-        if launchStatus != 0 {
-            throw BuildError.launchFailed("Failed to launch app: \(launchOutput)")
-        }
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    let output = String(data: data, encoding: .utf8) ?? ""
 
-        BuildLogger.info("Successfully launched app in simulator")
+    return (process.terminationStatus, output)
+  }
+
+  private func terminateApp(_ bundleId: String) throws {
+    BuildLogger.debug("Terminating any existing instances of \(bundleId)...")
+    let (status, output) = try runSimCtlCommand(["terminate", "booted", bundleId])
+
+    // Status 146 means app wasn't running, which is fine
+    if status != 0, status != 146 {
+      BuildLogger.warning("Warning: Failed to terminate app: \(output)")
     }
+  }
+
 }
