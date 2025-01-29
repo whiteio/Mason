@@ -13,7 +13,6 @@ struct BuildConfig {
     let sourceDir: String
     let buildDir: String
     let resourcesDir: String
-    let ipaDir: String
     let deploymentTarget: String
 
     var sdkPath: String {

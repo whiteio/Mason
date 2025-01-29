@@ -12,8 +12,6 @@ struct AppConfig: Codable {
     let bundleId: String
     let sourceDir: String
     let resourcesDir: String
-    let buildDir: String
-    let ipaDir: String
     let deploymentTarget: String
     let modules: [String]
 }

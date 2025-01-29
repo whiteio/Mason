@@ -10,6 +10,10 @@ import Yams
 import ArgumentParser
 import Foundation
 
+struct Constants {
+    static let buildDir: String = ".build"
+}
+
 struct Build: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "build",
@@ -18,7 +22,7 @@ struct Build: ParsableCommand {
     
     @Argument(help: "The target to build (path to project directory)")
     var target: String
-    
+        
     func validate() throws {
         let url = URL(fileURLWithPath: target)
         guard FileManager.default.fileExists(atPath: url.path) else {
@@ -47,9 +51,8 @@ struct Build: ParsableCommand {
                     appName: appConfig.appName,
                     bundleId: appConfig.bundleId,
                     sourceDir: target,
-                    buildDir: "\(target)/\(appConfig.buildDir)",
+                    buildDir: "\(target)/\(Constants.buildDir)",
                     resourcesDir: "\(target)/\(appConfig.resourcesDir)",
-                    ipaDir: "\(target)/\(appConfig.ipaDir)",
                     deploymentTarget: appConfig.deploymentTarget
                 )
 

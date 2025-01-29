@@ -58,10 +58,8 @@ final class BuildSystem {
 
     private func prepareDirectories() throws {
         try? fileManager.removeItem(atPath: config.buildDir)
-        try? fileManager.removeItem(atPath: config.ipaDir)
 
         try fileManager.createDirectory(atPath: config.buildDir, withIntermediateDirectories: true)
-        try fileManager.createDirectory(atPath: config.ipaDir, withIntermediateDirectories: true)
     }
 
     private func createAppBundle() throws {

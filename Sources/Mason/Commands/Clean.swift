@@ -33,8 +33,7 @@ struct Clean: ParsableCommand {
         let appConfig = try parseAppConfig()
         
         let dirsToClean = [
-            "\(target)/\(appConfig.buildDir)",
-            "\(target)/\(appConfig.ipaDir)"
+            "\(target)/\(Constants.buildDir)",
         ]
         
         let fileManager = FileManager.default
