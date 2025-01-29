@@ -31,68 +31,103 @@ final class BuildSystem {
   // MARK: Internal
 
   func buildApp() async throws {
-    BuildTimer.reset()
-    BuildTimer.start("Total Build")
+    await BuildTimer.reset()
+    await BuildTimer.start("Total Build")
 
-    BuildTimer.start("Prepare Directories")
+    await BuildTimer.start("Prepare Directories")
     try prepareDirectories()
-    BuildTimer.end("Prepare Directories")
+    await BuildTimer.end("Prepare Directories")
 
-    BuildTimer.start("Module Compilation")
+    await BuildTimer.start("Module Compilation")
     let buildOrder = resolveBuildOrder()
-    for moduleName in buildOrder {
-      BuildTimer.start("Module: \(moduleName)")
-      try await buildModule(moduleName)
-      BuildTimer.end("Module: \(moduleName)")
-    }
-    BuildTimer.end("Module Compilation")
+    try await buildModulesInParallel(Array(buildOrder))
+    await BuildTimer.end("Module Compilation")
 
-    BuildTimer.start("Final Link")
+    await BuildTimer.start("Final Link")
     try await compileAndLink()
-    BuildTimer.end("Final Link")
+    await BuildTimer.end("Final Link")
 
-    BuildTimer.start("Bundle Creation")
+    await BuildTimer.start("Bundle Creation")
     try createAppBundle()
     try processResources()
-    BuildTimer.end("Bundle Creation")
+    await BuildTimer.end("Bundle Creation")
 
-    BuildTimer.start("Installation")
+    await BuildTimer.start("Installation")
     try simulatorManager.install(config)
-    BuildTimer.end("Installation")
+    await BuildTimer.end("Installation")
 
-    BuildTimer.end("Total Build")
-    BuildTimer.summarize()
+    await BuildTimer.end("Total Build")
+    await BuildTimer.summarize()
   }
 
   func buildSingleModule(_ moduleName: String) async throws {
-    BuildTimer.reset()
-    BuildTimer.start("Module Build")
+    await BuildTimer.reset()
+    await BuildTimer.start("Module Build")
 
-    BuildTimer.start("Prepare Directories")
+    await BuildTimer.start("Prepare Directories")
     try prepareDirectories()
-    BuildTimer.end("Prepare Directories")
+    await BuildTimer.end("Prepare Directories")
 
-    BuildTimer.start("Dependency Resolution")
+    await BuildTimer.start("Dependency Resolution")
     let dependencies = dependencyGraph.resolveDependencies(for: moduleName)
     // Remove the target module from dependencies as we'll build it last
     let moduleDependencies = dependencies.filter { $0 != moduleName }
     BuildLogger.debug("Dependencies for \(moduleName): \(moduleDependencies)")
-    BuildTimer.end("Dependency Resolution")
+    await BuildTimer.end("Dependency Resolution")
 
-    BuildTimer.start("Dependencies Compilation")
-    for dependency in moduleDependencies {
-      BuildTimer.start("Dependency: \(dependency)")
-      try await buildModule(dependency)
-      BuildTimer.end("Dependency: \(dependency)")
+    // Group dependencies by level for parallel building
+    await BuildTimer.start("Dependencies Compilation")
+    var modulesByLevel: [Int: Set<String>] = [:]
+    for module in moduleDependencies {
+      let deps = dependencyGraph.resolveDependencies(for: module)
+      let level = deps.count
+      modulesByLevel[level, default: []].insert(module)
     }
-    BuildTimer.end("Dependencies Compilation")
 
-    BuildTimer.start("Target Module")
-    try await buildModule(moduleName)
-    BuildTimer.end("Target Module")
+    // Build dependencies level by level
+    let tracker = ParallelBuildTracker()
+    for level in modulesByLevel.keys.sorted() {
+      guard let modulesAtLevel = modulesByLevel[level] else { continue }
 
-    BuildTimer.end("Module Build")
-    BuildTimer.summarize()
+      BuildLogger.info("Building level \(level) dependencies in parallel: \(modulesAtLevel.joined(separator: ", "))")
+
+      try await withThrowingTaskGroup(of: Void.self) { group in
+        for module in modulesAtLevel {
+          let operation = ModuleBuildOperation(
+            moduleName: module,
+            config: config,
+            useCache: useCache,
+            buildDir: config.buildDir,
+            sourceDir: config.sourceDir,
+            dependencies: dependencyGraph.adjacencyList[module] ?? [])
+
+          group.addTask {
+            await tracker.moduleStarted(operation.moduleName)
+            defer { Task { await tracker.moduleFinished(operation.moduleName) } }
+            try await operation.execute()
+          }
+        }
+
+        try await group.waitForAll()
+        await tracker.logLevelStatistics(level)
+      }
+    }
+    await BuildTimer.end("Dependencies Compilation")
+
+    // Build the target module
+    await BuildTimer.start("Target Module")
+    let targetOperation = ModuleBuildOperation(
+      moduleName: moduleName,
+      config: config,
+      useCache: useCache,
+      buildDir: config.buildDir,
+      sourceDir: config.sourceDir,
+      dependencies: dependencyGraph.adjacencyList[moduleName] ?? [])
+    try await targetOperation.execute()
+    await BuildTimer.end("Target Module")
+
+    await BuildTimer.end("Module Build")
+    await BuildTimer.summarize()
   }
 
   // MARK: Private
@@ -102,6 +137,64 @@ final class BuildSystem {
   private let simulatorManager: SimulatorManager
   private let dependencyGraph: DependencyGraph
   private let useCache: Bool
+
+  private func buildModulesInParallel(_ modules: [String]) async throws {
+    // Track currently building modules
+    let tracker = ParallelBuildTracker()
+
+    // Group modules by their dependency level
+    var modulesByLevel: [Int: Set<String>] = [:]
+    for module in modules {
+      let dependencies = dependencyGraph.resolveDependencies(for: module)
+      let level = dependencies.count
+      modulesByLevel[level, default: []].insert(module)
+    }
+
+    BuildLogger.info("Parallel build plan:")
+    for (level, modules) in modulesByLevel {
+      BuildLogger.info("Level \(level): \(modules.joined(separator: ", "))")
+    }
+
+    // Build modules level by level
+    for level in modulesByLevel.keys.sorted() {
+      guard let modulesAtLevel = modulesByLevel[level] else { continue }
+
+      BuildLogger.info("Building level \(level) modules in parallel: \(modulesAtLevel.joined(separator: ", "))")
+
+      try await withThrowingTaskGroup(of: Void.self) { group in
+        for module in modulesAtLevel {
+          // Create an operation with all necessary data
+          let operation = ModuleBuildOperation(
+            moduleName: module,
+            config: config,
+            useCache: useCache,
+            buildDir: config.buildDir,
+            sourceDir: config.sourceDir,
+            dependencies: dependencyGraph.adjacencyList[module] ?? [])
+
+          group.addTask { [operation] in
+            // Track when module build starts
+            await tracker.moduleStarted(operation.moduleName)
+            defer {
+              Task {
+                await tracker.moduleFinished(operation.moduleName)
+              }
+            }
+
+            try await operation.execute()
+          }
+        }
+
+        try await group.waitForAll()
+      }
+
+      // Log statistics for this level
+      await tracker.logLevelStatistics(level)
+    }
+
+    // Log overall build statistics
+    await tracker.logFinalStatistics()
+  }
 
   private func resolveBuildOrder() -> UniquedSequence<[String], String> {
     var buildOrder: [String] = []
@@ -250,114 +343,6 @@ extension BuildSystem {
 }
 
 extension BuildSystem {
-  private func buildModule(_ moduleName: String) async throws {
-    let absoluteSourceDir = URL(fileURLWithPath: config.sourceDir).standardizedFileURL.path
-    let absoluteBuildDir = URL(fileURLWithPath: config.buildDir).standardizedFileURL.path
-
-    let modulePath = "\(absoluteSourceDir)/\(moduleName)/Sources"
-    let moduleBuildPath = "\(absoluteBuildDir)/\(moduleName)"
-
-    BuildLogger.info("Building module at path: \(modulePath)")
-    BuildLogger.debug("Module build path: \(moduleBuildPath)")
-
-    try fileManager.createDirectory(atPath: moduleBuildPath, withIntermediateDirectories: true)
-
-    let sources = try findSwiftFiles(in: modulePath)
-    BuildLogger.debug("Found source files: \(sources)")
-
-    let outputFileMap = try createOutputFileMap(sources: sources, buildPath: moduleBuildPath)
-    let outputFileMapPath = "\(moduleBuildPath)/output-file-map.json"
-    try outputFileMap.write(toFile: outputFileMapPath, atomically: true, encoding: .utf8)
-
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/swiftc")
-
-    // Set the current directory to the build path
-    process.currentDirectoryURL = URL(fileURLWithPath: moduleBuildPath)
-
-    let cache = ModuleCache(cacheDir: "\(config.buildDir)/../.cache", fileManager: fileManager)
-    var args = [
-      "-sdk", config.sdkPath,
-      "-target", "\(config.simulatorArch)-apple-ios\(config.deploymentTarget)-simulator",
-      "-emit-module",
-      "-emit-module-path", ".",
-      "-emit-dependencies",
-      "-emit-objc-header",
-      "-emit-objc-header-path", "\(moduleName).h",
-      "-module-name", moduleName,
-      "-output-file-map", "output-file-map.json",
-      "-parse-as-library",
-      "-c",
-      "-swift-version", "5",
-      "-whole-module-optimization",
-    ]
-
-    let dependencies = dependencyGraph.adjacencyList[moduleName] ?? []
-    for dependency in dependencies {
-      args += ["-I", "\(absoluteBuildDir)/\(dependency)"]
-    }
-
-    let key = try cache.computeModuleKey(
-      name: moduleName,
-      sourceFiles: sources,
-      dependencies: [:],
-      compilerArgs: args)
-
-    if cache.hasCachedModule(key: key), useCache {
-      BuildLogger.info("Using cached version of module \(moduleName)")
-      try cache.restoreModule(key: key, buildDir: absoluteBuildDir)
-      return
-    }
-
-    args += sources
-
-    let pipe = Pipe()
-    process.standardError = pipe
-    process.standardOutput = pipe
-    process.arguments = args
-
-    let fullCommand = (["/usr/bin/swiftc"] + args).joined(separator: " ")
-    BuildLogger.debug("\nExecuting compiler command:\n\(fullCommand)\n")
-
-    try process.run()
-    process.waitUntilExit()
-
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-    if let output = String(data: data, encoding: .utf8) {
-      BuildLogger.debug("Compiler output for \(moduleName):\n\(output)")
-    }
-
-    if process.terminationStatus != 0 {
-      throw BuildError.compilationFailed("Failed to build module \(moduleName)")
-    }
-
-    try cache.cacheModule(
-      key: key,
-      buildDir: absoluteBuildDir,
-      artifacts: [
-        "\(moduleName)/\(moduleName).d",
-        "\(moduleName)/\(moduleName).h",
-        "\(moduleName)/\(moduleName).swiftmodule",
-        "\(moduleName)/\(moduleName).emit-module.d",
-        "\(moduleName)/\(moduleName).o",
-        "\(moduleName)/module.swiftdeps",
-      ])
-  }
-
-  private func createOutputFileMap(sources _: [String], buildPath: String) throws -> String {
-    // With WMO, we only need the special empty key for whole-module outputs
-    let map: [String: [String: String]] = [
-      "": [
-        "object": "\(URL(fileURLWithPath: buildPath).lastPathComponent).o",
-        "swift-dependencies": "module.swiftdeps",
-      ],
-    ]
-
-    let jsonData = try JSONSerialization.data(withJSONObject: map, options: .prettyPrinted)
-    let str = String(data: jsonData, encoding: .utf8)!
-    BuildLogger.debug("Output file map:\n\(str)")
-    return str
-  }
 
   private func compileAndLink() async throws {
     let mainSources = try findSwiftFiles(in: "\(config.sourceDir)/Sources")

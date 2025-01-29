@@ -7,11 +7,34 @@
 
 import Foundation
 
-enum BuildTimer {
+actor BuildTimer {
 
   // MARK: Internal
 
-  static func start(_ phase: String) {
+  static func start(_ phase: String) async {
+    await shared.startTimer(phase)
+  }
+
+  static func end(_ phase: String) async {
+    await shared.endTimer(phase)
+  }
+
+  static func reset() async {
+    await shared.resetTimers()
+  }
+
+  static func summarize() async {
+    await shared.summarizeTimers()
+  }
+
+  // MARK: Private
+
+  private static let shared = BuildTimer()
+
+  private var timers: [String: CFAbsoluteTime] = [:]
+  private var measurements: [(String, TimeInterval)] = []
+
+  private func startTimer(_ phase: String) {
     timers[phase] = CFAbsoluteTimeGetCurrent()
     // Only log start in verbose mode
     if BuildLogger.isVerbose {
@@ -19,7 +42,7 @@ enum BuildTimer {
     }
   }
 
-  static func end(_ phase: String) {
+  private func endTimer(_ phase: String) {
     guard let startTime = timers[phase] else {
       BuildLogger.warning("Attempted to end timer for unknown phase: \(phase)", category: "BuildTimer")
       return
@@ -35,7 +58,12 @@ enum BuildTimer {
     }
   }
 
-  static func summarize() {
+  private func resetTimers() {
+    timers.removeAll()
+    measurements.removeAll()
+  }
+
+  private func summarizeTimers() {
     guard !measurements.isEmpty else { return }
 
     let totalTime = measurements.reduce(0.0) { $0 + $1.1 }
@@ -56,15 +84,4 @@ enum BuildTimer {
     // Always show summary, regardless of verbose mode
     print(summary)
   }
-
-  static func reset() {
-    timers.removeAll()
-    measurements.removeAll()
-  }
-
-  // MARK: Private
-
-  private nonisolated(unsafe) static var timers: [String: CFAbsoluteTime] = [:]
-  private nonisolated(unsafe) static var measurements: [(String, TimeInterval)] = []
-
 }
