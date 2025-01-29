@@ -13,6 +13,7 @@ final class BuildSystem {
     private let fileManager: FileManager
     private let simulatorManager: SimulatorManager
     private let dependencyGraph: DependencyGraph
+    private let useCache: Bool
 
     private var moduleCache: ModuleCache {
         ModuleCache(cacheDir: "\(config.buildDir)/../.cache", fileManager: fileManager)
@@ -22,12 +23,14 @@ final class BuildSystem {
         config: BuildConfig,
         fileManager: FileManager = .default,
         simulatorManager: SimulatorManager,
-        dependencyGraph: DependencyGraph
+        dependencyGraph: DependencyGraph,
+        useCache: Bool
     ) {
         self.config = config
         self.fileManager = fileManager
         self.simulatorManager = simulatorManager
         self.dependencyGraph = dependencyGraph
+        self.useCache = useCache
     }
 
     func build() async throws {
@@ -267,7 +270,7 @@ extension BuildSystem {
             compilerArgs: args
         )
 
-        if cache.hasCachedModule(key: key) {
+        if cache.hasCachedModule(key: key) && useCache {
             BuildLogger.info("Using cached version of module \(moduleName)")
             try cache.restoreModule(key: key, buildDir: absoluteBuildDir)
             return

@@ -22,6 +22,9 @@ struct Build: ParsableCommand {
     @Argument(help: "The target to build (path to project directory)")
     var target: String
 
+    @Flag(name: .long, help: "Force a clean build ignoring the module cache")
+     var clean: Bool = false
+
     func validate() throws {
         let url = URL(fileURLWithPath: target)
         guard FileManager.default.fileExists(atPath: url.path) else {
@@ -39,6 +42,9 @@ struct Build: ParsableCommand {
             do {
                 BuildLogger.debug("Parsing configuration and building dependency graph...")
                 BuildLogger.debug("Target directory: \(target)")
+                if clean {
+                    BuildLogger.info("Performing clean build - module cache will be ignored")
+                }
 
                 let appConfig = try parseAppConfig()
                 BuildLogger.debug("App Name: \(appConfig.appName)")
@@ -60,7 +66,8 @@ struct Build: ParsableCommand {
                 let buildSystem = BuildSystem(
                     config: buildConfig,
                     simulatorManager: simulatorManager,
-                    dependencyGraph: dependencyGraph
+                    dependencyGraph: dependencyGraph,
+                    useCache: !clean
                 )
 
                 BuildLogger.info("Starting build process...")
