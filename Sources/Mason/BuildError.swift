@@ -7,10 +7,6 @@
 
 enum BuildError: Error {
     case compilationFailed(String)
-    case resourceProcessingFailed(String)
-    case bundleCreationFailed(String)
-    case ipaCreationFailed(String)
-    case invalidPath(String)
     case signingFailed(String)
     case launchFailed(String)
     case installationFailed(String)
