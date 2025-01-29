@@ -6,7 +6,6 @@
 //
 
 import ArgumentParser
-import os
 import Foundation
 import Yams
 
@@ -27,7 +26,7 @@ struct Clean: ParsableCommand {
     }
     
     func run() throws {
-        os_log("Cleaning build artifacts from \(target)")
+        BuildLogger.info("Cleaning build artifacts from \(target)")
         
         // Parse app config to get build directories
         let appConfig = try parseAppConfig()

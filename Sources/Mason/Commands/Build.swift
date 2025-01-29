@@ -5,7 +5,6 @@
 //  Created by Chris White on 1/29/25.
 //
 
-import os
 import Yams
 import ArgumentParser
 import Foundation
@@ -38,8 +37,8 @@ struct Build: ParsableCommand {
         
         Task {
             do {
-                os_log("Parsing configuration and building dependency graph...")
-                os_log("Target directory: \(target)")
+                BuildLogger.debug("Parsing configuration and building dependency graph...")
+                BuildLogger.debug("Target directory: \(target)")
 
                 let appConfig = try parseAppConfig()
                 print("App Name: \(appConfig.appName)")
@@ -64,9 +63,9 @@ struct Build: ParsableCommand {
                     dependencyGraph: dependencyGraph
                 )
 
-                os_log("Starting build process...")
+                BuildLogger.info("Starting build process...")
                 try await buildSystem.build()
-                os_log("Build completed successfully!")
+                BuildLogger.info("Build completed successfully!")
                 
             } catch {
                 asyncError = error
@@ -97,8 +96,8 @@ struct Build: ParsableCommand {
             let moduleConfigContent = try String(contentsOfFile: moduleConfigPath, encoding: .utf8)
             let moduleConfig = try YAMLDecoder().decode(ModuleConfig.self, from: moduleConfigContent)
 
-            os_log("Parsed module: \(moduleConfig.moduleName)")
-            os_log("Dependencies: \(moduleConfig.dependencies ?? [])")
+            BuildLogger.debug("Parsed module: \(moduleConfig.moduleName)")
+            BuildLogger.debug("Dependencies: \(moduleConfig.dependencies ?? [])")
 
             dependencyGraph.addModule(moduleConfig.moduleName, dependencies: moduleConfig.dependencies)
         }

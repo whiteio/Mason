@@ -7,7 +7,6 @@
 
 import Foundation
 import Algorithms
-import os
 
 final class BuildSystem {
     private let config: BuildConfig
@@ -41,8 +40,8 @@ final class BuildSystem {
         try createAppBundle()
         try processResources()
 
-        os_log("Successfully built \(self.config.appName).app")
-        os_log("App location: \(self.config.buildDir)/\(self.config.appName).app")
+        BuildLogger.info("Successfully built \(self.config.appName).app")
+        BuildLogger.debug("App location: \(self.config.buildDir)/\(self.config.appName).app")
 
         try simulatorManager.install(config)
     }
@@ -168,7 +167,7 @@ final class BuildSystem {
 
 extension BuildSystem {
     private func findSwiftFiles(in directory: String) throws -> [String] {
-        os_log("Finding swift files in directory: \(directory)")
+        BuildLogger.info("Finding swift files in directory: \(directory)")
         
         let url = URL(fileURLWithPath: directory)
         let enumerator = fileManager.enumerator(
@@ -185,7 +184,7 @@ extension BuildSystem {
             }
         }
 
-        os_log("Found Swift files: \(swiftFiles)")
+        BuildLogger.debug("Found Swift files: \(swiftFiles)")
 
         guard !swiftFiles.isEmpty else {
             throw BuildError.compilationFailed("No Swift files found in \(directory)")
@@ -203,13 +202,13 @@ extension BuildSystem {
         let modulePath = "\(absoluteSourceDir)/\(moduleName)/Sources"
         let moduleBuildPath = "\(absoluteBuildDir)/\(moduleName)"
 
-        os_log("Building module at path: \(modulePath)")
-        os_log("Module build path: \(moduleBuildPath)")
+        BuildLogger.info("Building module at path: \(modulePath)")
+        BuildLogger.debug("Module build path: \(moduleBuildPath)")
         
         try fileManager.createDirectory(atPath: moduleBuildPath, withIntermediateDirectories: true)
 
         let sources = try findSwiftFiles(in: modulePath)
-        os_log("Found source files: \(sources)")
+        BuildLogger.debug("Found source files: \(sources)")
 
         let outputFileMap = try createOutputFileMap(sources: sources, buildPath: moduleBuildPath)
         let outputFileMapPath = "\(moduleBuildPath)/output-file-map.json"
@@ -250,14 +249,14 @@ extension BuildSystem {
         process.arguments = args
 
         let fullCommand = (["/usr/bin/swiftc"] + args).joined(separator: " ")
-        os_log("\nExecuting compiler command:\n\(fullCommand)\n")
+        BuildLogger.debug("\nExecuting compiler command:\n\(fullCommand)\n")
 
         try process.run()
         process.waitUntilExit()
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         if let output = String(data: data, encoding: .utf8) {
-            os_log("Compiler output for \(moduleName):\n\(output)")
+            BuildLogger.debug("Compiler output for \(moduleName):\n\(output)")
         }
 
         if process.terminationStatus != 0 {
@@ -276,7 +275,7 @@ extension BuildSystem {
         
         let jsonData = try JSONSerialization.data(withJSONObject: map, options: .prettyPrinted)
         let str = String(data: jsonData, encoding: .utf8)!
-        os_log("Output file map:\n\(str)")
+        BuildLogger.debug("Output file map:\n\(str)")
         return str
     }
     
@@ -326,14 +325,14 @@ extension BuildSystem {
         process.standardOutput = pipe
         process.arguments = args
         
-        os_log("Compiling and linking with arguments: \(args.joined(separator: " "))")
+        BuildLogger.info("Compiling and linking with arguments: \(args.joined(separator: " "))")
         
         try process.run()
         process.waitUntilExit()
         
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         if let output = String(data: data, encoding: .utf8) {
-            os_log("Compiler output:\n\(output)")
+            BuildLogger.debug("Compiler output:\n\(output)")
         }
         
         if process.terminationStatus != 0 {
@@ -387,14 +386,14 @@ extension BuildSystem {
         process.standardOutput = pipe
         process.arguments = args
 
-        os_log("Linking modules with arguments: \(args.joined(separator: " "))")
+        BuildLogger.info("Linking modules with arguments: \(args.joined(separator: " "))")
 
         try process.run()
         process.waitUntilExit()
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         if let output = String(data: data, encoding: .utf8) {
-            os_log("Linker output:\n\(output)")
+            BuildLogger.debug("Linker output:\n\(output)")
         }
 
         if process.terminationStatus != 0 {
