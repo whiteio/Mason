@@ -17,6 +17,7 @@ struct AppConfig: Codable {
   let deploymentTarget: String
   let swiftVersion: String
   let modules: [String]
+  let plist: PlistConfig
   
   enum CodingKeys: String, CodingKey {
       case appName
@@ -26,8 +27,21 @@ struct AppConfig: Codable {
       case deploymentTarget
       case modules
       case swiftVersion = "swift-version"
+    case plist
   }
 }
+
+struct PlistConfig: Codable {
+        var version: String
+        var buildNumber: String
+        var infoPlist: InfoPlistConfig
+        
+        enum CodingKeys: String, CodingKey {
+            case version
+            case buildNumber = "build-number"
+            case infoPlist = "info-plist"
+        }
+    }
 
 // MARK: - ModuleConfig
 

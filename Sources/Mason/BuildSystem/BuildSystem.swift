@@ -243,59 +243,77 @@ final class BuildSystem {
 
   private func processResources() throws {
     let appBundlePath = "\(config.buildDir)/\(config.appName).app"
-    try createDefaultInfoPlist(at: "\(appBundlePath)/Info.plist")
+    try createInfoPlist(at: "\(appBundlePath)/Info.plist")
   }
 
-  private func createDefaultInfoPlist(at path: String) throws {
-    let infoPlist = """
-      <?xml version="1.0" encoding="UTF-8"?>
-      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-      <plist version="1.0">
-      <dict>
-          <key>CFBundleDevelopmentRegion</key>
-          <string>en</string>
-          <key>CFBundleExecutable</key>
-          <string>\(config.appName)</string>
-          <key>CFBundleIdentifier</key>
-          <string>\(config.bundleId)</string>
-          <key>CFBundleInfoDictionaryVersion</key>
-          <string>6.0</string>
-          <key>CFBundleName</key>
-          <string>\(config.appName)</string>
-          <key>CFBundlePackageType</key>
-          <string>APPL</string>
-          <key>CFBundleShortVersionString</key>
-          <string>1.0</string>
-          <key>CFBundleVersion</key>
-          <string>1</string>
-          <key>LSRequiresIPhoneOS</key>
-          <true/>
-          <key>UILaunchScreen</key>
-          <dict/>
-          <key>UIRequiredDeviceCapabilities</key>
-          <array>
-              <string>arm64</string>
-          </array>
-          <key>UISupportedInterfaceOrientations</key>
-          <array>
-              <string>UIInterfaceOrientationPortrait</string>
-              <string>UIInterfaceOrientationLandscapeLeft</string>
-              <string>UIInterfaceOrientationLandscapeRight</string>
-          </array>
-          <key>MinimumOSVersion</key>
-          <string>\(config.deploymentTarget)</string>
-          <key>DTPlatformName</key>
-          <string>iphonesimulator</string>
-          <key>DTPlatformVersion</key>
-          <string>17.0</string>
-          <key>DTSDKName</key>
-          <string>iphonesimulator17.0</string>
-      </dict>
-      </plist>
-      """
-
-    try infoPlist.write(toFile: path, atomically: true, encoding: .utf8)
-  }
+  private func createInfoPlist(at path: String) throws {
+          // Base plist entries that are always required
+          var plistDict: [String: Any] = [
+              "CFBundleDevelopmentRegion": "en",
+              "CFBundleExecutable": config.appName,
+              "CFBundleIdentifier": config.bundleId,
+              "CFBundleInfoDictionaryVersion": "6.0",
+              "CFBundleName": config.appName,
+              "CFBundlePackageType": "APPL",
+              "CFBundleShortVersionString": config.plist.version,
+              "CFBundleVersion": config.plist.buildNumber,
+              "MinimumOSVersion": config.deploymentTarget,
+              "DTPlatformName": "iphonesimulator",
+              "DTPlatformVersion": "17.0",
+              "DTSDKName": "iphonesimulator17.0"
+          ]
+          
+          // Add launch screen if enabled
+          if config.plist.infoPlist.launchScreen {
+              plistDict["UILaunchScreen"] = [String: Any]()
+          }
+          
+          // Add device capabilities
+          plistDict["UIRequiredDeviceCapabilities"] = config.plist.infoPlist.requiredDeviceCapabilities
+          
+          // Add orientations
+          plistDict["UISupportedInterfaceOrientations"] = config.plist.infoPlist.supportedOrientations
+          
+          // Convert PlistValue custom entries to standard types
+          let customEntries = convertPlistValues(config.plist.infoPlist.customEntries)
+          
+          // Merge in any custom entries
+          for (key, value) in customEntries {
+              plistDict[key] = value
+          }
+          
+          // Convert to property list format
+          let data = try PropertyListSerialization.data(
+              fromPropertyList: plistDict,
+              format: .xml,
+              options: 0)
+          try data.write(to: URL(fileURLWithPath: path))
+      }
+      
+      private func convertPlistValues(_ values: [String: PlistValue]) -> [String: Any] {
+          var result = [String: Any]()
+          
+          for (key, value) in values {
+              result[key] = convertPlistValue(value)
+          }
+          
+          return result
+      }
+      
+      private func convertPlistValue(_ value: PlistValue) -> Any {
+          switch value {
+          case .string(let str):
+              return str
+          case .bool(let bool):
+              return bool
+          case .integer(let int):
+              return int
+          case .array(let arr):
+              return arr.map { convertPlistValue($0) }
+          case .dictionary(let dict):
+              return convertPlistValues(dict)
+          }
+      }
 
   private func setExecutablePermissions(atPath path: String) throws {
     let process = Process()

@@ -6,6 +6,11 @@ import Foundation
 /// Manages caching of built modules to enable incremental builds
 final class ModuleCache {
 
+  // MARK: Private
+
+  private let fileManager: FileManager
+  private let cacheDir: String
+  
   // MARK: Lifecycle
 
   init(cacheDir: String, fileManager: FileManager = .default) {
@@ -28,7 +33,7 @@ final class ModuleCache {
     var cacheFileName: String {
       // Use first 8 chars of content hash as cache key
       let data = "\(name):\(sourceHash):\(dependencyHashes):\(compilerArgs)".data(using: .utf8)!
-      var contentHash: String =
+      let contentHash: String =
         if #available(macOS 10.15, *) {
           SHA256.hash(data: data).compactMap { String(format: "%02x", $0) }.joined()
         } else {
@@ -194,12 +199,6 @@ final class ModuleCache {
       }
     }
   }
-
-  // MARK: Private
-
-  private let fileManager: FileManager
-  private let cacheDir: String
-
 }
 
 // MARK: - SHA256Legacy

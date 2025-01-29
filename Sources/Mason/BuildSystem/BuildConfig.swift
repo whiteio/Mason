@@ -15,6 +15,7 @@ struct BuildConfig {
   let resourcesDir: String
   let deploymentTarget: String
   let swiftVersion: String
+  let plist: PlistConfig
 
   var sdkPath: String {
     "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk"
