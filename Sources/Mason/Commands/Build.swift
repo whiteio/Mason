@@ -97,18 +97,41 @@ struct Build: ParsableCommand {
 
     private func buildDependencyGraph(appConfig: AppConfig) throws -> DependencyGraph {
         let dependencyGraph = DependencyGraph()
+        var processedModules = Set<String>()
 
-        for moduleName in appConfig.modules {
+        func processModule(_ moduleName: String) throws {
+            // Skip if we've already processed this module
+            guard !processedModules.contains(moduleName) else {
+                return
+            }
+            
+            processedModules.insert(moduleName)
+            
+            // Read and parse the module config
             let moduleConfigPath = "\(source)/\(moduleName)/module.yml"
             let moduleConfigContent = try String(contentsOfFile: moduleConfigPath, encoding: .utf8)
             let moduleConfig = try YAMLDecoder().decode(ModuleConfig.self, from: moduleConfigContent)
-
-            BuildLogger.debug("Parsed module: \(moduleConfig.moduleName)")
+            
+            BuildLogger.debug("Processing module: \(moduleConfig.moduleName)")
             BuildLogger.debug("Dependencies: \(moduleConfig.dependencies ?? [])")
-
+            
+            // Add this module to the graph
             dependencyGraph.addModule(moduleConfig.moduleName, dependencies: moduleConfig.dependencies)
+            
+            // Recursively process all dependencies
+            if let dependencies = moduleConfig.dependencies {
+                for dependency in dependencies {
+                    try processModule(dependency)
+                }
+            }
         }
-
+        
+        // Start processing from the root modules in app.yml
+        for moduleName in appConfig.modules {
+            try processModule(moduleName)
+        }
+        
+        BuildLogger.debug("Complete dependency graph: \(dependencyGraph.adjacencyList)")
         return dependencyGraph
     }
 }
