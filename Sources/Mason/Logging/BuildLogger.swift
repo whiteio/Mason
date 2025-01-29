@@ -19,6 +19,7 @@ final class BuildLogger {
     private static let subsystem = "com.mason.build"
     private static let logger = Logger(subsystem: subsystem, category: "Build")
     nonisolated(unsafe) private static var shouldLogToConsole: Bool = true
+    static var isVerbose: Bool { shouldLogToConsole }
     
     static func configure(logToConsole: Bool = true) {
         self.shouldLogToConsole = logToConsole
@@ -28,6 +29,7 @@ final class BuildLogger {
         let fileName = (file as NSString).lastPathComponent
         let prefix = "[\(level.rawValue)] [\(category)] [\(fileName):\(line)]"
         
+        // Log to os_log
         switch level {
         case .debug:
             logger.debug("\(prefix) \(message)")
@@ -39,6 +41,7 @@ final class BuildLogger {
             logger.error("\(prefix) \(message)")
         }
         
+        // Also log to console if enabled
         if shouldLogToConsole {
             let timestamp = ISO8601DateFormatter().string(from: Date())
             print("\(timestamp) \(prefix) \(message)")

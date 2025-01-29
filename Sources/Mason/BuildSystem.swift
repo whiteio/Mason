@@ -27,23 +27,37 @@ final class BuildSystem {
     }
 
     func build() async throws {
+        BuildTimer.reset()
+        BuildTimer.start("Total Build")
+        
+        BuildTimer.start("Prepare Directories")
         try prepareDirectories()
-
+        BuildTimer.end("Prepare Directories")
+        
+        BuildTimer.start("Module Compilation")
         let buildOrder = resolveBuildOrder()
-
         for moduleName in buildOrder {
+            BuildTimer.start("Module: \(moduleName)")
             try await buildModule(moduleName)
+            BuildTimer.end("Module: \(moduleName)")
         }
-
+        BuildTimer.end("Module Compilation")
+        
+        BuildTimer.start("Final Link")
         try await compileAndLink()
-
+        BuildTimer.end("Final Link")
+        
+        BuildTimer.start("Bundle Creation")
         try createAppBundle()
         try processResources()
-
-        BuildLogger.info("Successfully built \(self.config.appName).app")
-        BuildLogger.debug("App location: \(self.config.buildDir)/\(self.config.appName).app")
-
+        BuildTimer.end("Bundle Creation")
+        
+        BuildTimer.start("Installation")
         try simulatorManager.install(config)
+        BuildTimer.end("Installation")
+        
+        BuildTimer.end("Total Build")
+        BuildTimer.summarize()
     }
 
     private func resolveBuildOrder() -> UniquedSequence<[String], String> {
