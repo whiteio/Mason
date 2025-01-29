@@ -19,14 +19,14 @@ struct Build: ParsableCommand {
         abstract: "Build the specified target and install it to the simulator"
     )
 
-    @Argument(help: "The target to build (path to project directory)")
-    var target: String
+    @Option(name: .shortAndLong, help: "The source directory containing the project")
+    var source: String
 
     @Flag(name: .long, help: "Force a clean build ignoring the module cache")
      var clean: Bool = false
 
     func validate() throws {
-        let url = URL(fileURLWithPath: target)
+        let url = URL(fileURLWithPath: source)
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw ValidationError("The specified target directory does not exist: \(url.path)")
         }
@@ -41,7 +41,7 @@ struct Build: ParsableCommand {
         Task {
             do {
                 BuildLogger.debug("Parsing configuration and building dependency graph...")
-                BuildLogger.debug("Target directory: \(target)")
+                BuildLogger.debug("Target directory: \(source)")
                 if clean {
                     BuildLogger.info("Performing clean build - module cache will be ignored")
                 }
@@ -55,9 +55,9 @@ struct Build: ParsableCommand {
                 let buildConfig = BuildConfig(
                     appName: appConfig.appName,
                     bundleId: appConfig.bundleId,
-                    sourceDir: target,
-                    buildDir: "\(target)/\(Constants.buildDir)",
-                    resourcesDir: "\(target)/\(appConfig.resourcesDir)",
+                    sourceDir: source,
+                    buildDir: "\(source)/\(Constants.buildDir)",
+                    resourcesDir: "\(source)/\(appConfig.resourcesDir)",
                     deploymentTarget: appConfig.deploymentTarget
                 )
 
@@ -89,7 +89,7 @@ struct Build: ParsableCommand {
     }
 
     private func parseAppConfig() throws -> AppConfig {
-        let appConfigPath = "\(target)/app.yml"
+        let appConfigPath = "\(source)/app.yml"
         let appConfigContent = try String(contentsOfFile: appConfigPath, encoding: .utf8)
         let decoder = YAMLDecoder()
         return try decoder.decode(AppConfig.self, from: appConfigContent)
@@ -99,7 +99,7 @@ struct Build: ParsableCommand {
         let dependencyGraph = DependencyGraph()
 
         for moduleName in appConfig.modules {
-            let moduleConfigPath = "\(target)/\(moduleName)/module.yml"
+            let moduleConfigPath = "\(source)/\(moduleName)/module.yml"
             let moduleConfigContent = try String(contentsOfFile: moduleConfigPath, encoding: .utf8)
             let moduleConfig = try YAMLDecoder().decode(ModuleConfig.self, from: moduleConfigContent)
 
