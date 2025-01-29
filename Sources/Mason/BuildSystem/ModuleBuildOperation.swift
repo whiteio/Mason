@@ -64,7 +64,7 @@ struct ModuleBuildOperation: Sendable {
       "-output-file-map", "output-file-map.json",
       "-parse-as-library",
       "-c",
-      "-swift-version", "5",
+      "-swift-version", "\(config.swiftVersion)",
       "-whole-module-optimization",
     ]
 

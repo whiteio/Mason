@@ -84,7 +84,8 @@ struct Build: ParsableCommand {
           sourceDir: source,
           buildDir: "\(source)/\(Constants.buildDir)",
           resourcesDir: "\(source)/\(appConfig.resourcesDir)",
-          deploymentTarget: appConfig.deploymentTarget)
+          deploymentTarget: appConfig.deploymentTarget,
+          swiftVersion: appConfig.swiftVersion)
 
         let simulatorManager = SimulatorManager()
         let buildSystem = BuildSystem(

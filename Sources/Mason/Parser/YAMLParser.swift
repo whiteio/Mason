@@ -15,7 +15,18 @@ struct AppConfig: Codable {
   let sourceDir: String
   let resourcesDir: String
   let deploymentTarget: String
+  let swiftVersion: String
   let modules: [String]
+  
+  enum CodingKeys: String, CodingKey {
+      case appName
+      case bundleId
+      case sourceDir
+      case resourcesDir
+      case deploymentTarget
+      case modules
+      case swiftVersion = "swift-version"
+  }
 }
 
 // MARK: - ModuleConfig

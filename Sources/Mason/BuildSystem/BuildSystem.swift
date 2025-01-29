@@ -70,12 +70,10 @@ final class BuildSystem {
 
     await BuildTimer.start("Dependency Resolution")
     let dependencies = dependencyGraph.resolveDependencies(for: moduleName)
-    // Remove the target module from dependencies as we'll build it last
     let moduleDependencies = dependencies.filter { $0 != moduleName }
     BuildLogger.debug("Dependencies for \(moduleName): \(moduleDependencies)")
     await BuildTimer.end("Dependency Resolution")
 
-    // Group dependencies by level for parallel building
     await BuildTimer.start("Dependencies Compilation")
     var modulesByLevel: [Int: Set<String>] = [:]
     for module in moduleDependencies {
@@ -84,7 +82,6 @@ final class BuildSystem {
       modulesByLevel[level, default: []].insert(module)
     }
 
-    // Build dependencies level by level
     let tracker = ParallelBuildTracker()
     for level in modulesByLevel.keys.sorted() {
       guard let modulesAtLevel = modulesByLevel[level] else { continue }
@@ -139,7 +136,6 @@ final class BuildSystem {
   private let useCache: Bool
 
   private func buildModulesInParallel(_ modules: [String]) async throws {
-    // Track currently building modules
     let tracker = ParallelBuildTracker()
 
     // Group modules by their dependency level
@@ -163,7 +159,6 @@ final class BuildSystem {
 
       try await withThrowingTaskGroup(of: Void.self) { group in
         for module in modulesAtLevel {
-          // Create an operation with all necessary data
           let operation = ModuleBuildOperation(
             moduleName: module,
             config: config,
@@ -173,7 +168,6 @@ final class BuildSystem {
             dependencies: dependencyGraph.adjacencyList[module] ?? [])
 
           group.addTask { [operation] in
-            // Track when module build starts
             await tracker.moduleStarted(operation.moduleName)
             defer {
               Task {
@@ -188,11 +182,9 @@ final class BuildSystem {
         try await group.waitForAll()
       }
 
-      // Log statistics for this level
       await tracker.logLevelStatistics(level)
     }
 
-    // Log overall build statistics
     await tracker.logFinalStatistics()
   }
 
@@ -405,5 +397,4 @@ extension BuildSystem {
       throw BuildError.compilationFailed(String(data: data, encoding: .utf8) ?? "Unknown error")
     }
   }
-
 }
