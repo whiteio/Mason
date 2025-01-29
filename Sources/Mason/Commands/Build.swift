@@ -22,13 +22,23 @@ struct Build: ParsableCommand {
     @Option(name: .shortAndLong, help: "The source directory containing the project")
     var source: String
 
+    @Option(name: .shortAndLong, help: "The name of the module to build (optional)")
+    var module: String?
+
     @Flag(name: .long, help: "Force a clean build ignoring the module cache")
-     var clean: Bool = false
+    var clean: Bool = false
 
     func validate() throws {
         let url = URL(fileURLWithPath: source)
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw ValidationError("The specified target directory does not exist: \(url.path)")
+        }
+
+        if let moduleName = module {
+            let moduleUrl = url.appendingPathComponent(moduleName)
+            guard FileManager.default.fileExists(atPath: moduleUrl.path) else {
+                throw ValidationError("The specified module does not exist: \(moduleUrl.path)")
+            }
         }
     }
 
@@ -41,7 +51,10 @@ struct Build: ParsableCommand {
         Task {
             do {
                 BuildLogger.debug("Parsing configuration and building dependency graph...")
-                BuildLogger.debug("Target directory: \(source)")
+                BuildLogger.debug("Source directory: \(source)")
+                if let moduleName = module {
+                    BuildLogger.info("Building single module: \(moduleName)")
+                }
                 if clean {
                     BuildLogger.info("Performing clean build - module cache will be ignored")
                 }
@@ -51,6 +64,13 @@ struct Build: ParsableCommand {
                 BuildLogger.debug("Modules: \(appConfig.modules)")
 
                 let dependencyGraph = try buildDependencyGraph(appConfig: appConfig)
+
+                if let moduleName = module {
+                    // Verify module exists in dependency graph
+                    guard dependencyGraph.adjacencyList.keys.contains(moduleName) else {
+                        throw ValidationError("Module '\(moduleName)' not found in dependency graph")
+                    }
+                }
 
                 let buildConfig = BuildConfig(
                     appName: appConfig.appName,
@@ -62,7 +82,6 @@ struct Build: ParsableCommand {
                 )
 
                 let simulatorManager = SimulatorManager()
-
                 let buildSystem = BuildSystem(
                     config: buildConfig,
                     simulatorManager: simulatorManager,
@@ -71,9 +90,15 @@ struct Build: ParsableCommand {
                 )
 
                 BuildLogger.info("Starting build process...")
-                try await buildSystem.build()
-                BuildLogger.info("Build completed successfully!")
-
+                if let moduleName = module {
+                    // Build single module
+                    try await buildSystem.buildSingleModule(moduleName)
+                    BuildLogger.info("Module '\(moduleName)' built successfully!")
+                } else {
+                    // Build full app
+                    try await buildSystem.buildApp()
+                    BuildLogger.info("App built and installed successfully!")
+                }
             } catch {
                 asyncError = error
             }
@@ -104,20 +129,20 @@ struct Build: ParsableCommand {
             guard !processedModules.contains(moduleName) else {
                 return
             }
-            
+
             processedModules.insert(moduleName)
-            
+
             // Read and parse the module config
             let moduleConfigPath = "\(source)/\(moduleName)/module.yml"
             let moduleConfigContent = try String(contentsOfFile: moduleConfigPath, encoding: .utf8)
             let moduleConfig = try YAMLDecoder().decode(ModuleConfig.self, from: moduleConfigContent)
-            
+
             BuildLogger.debug("Processing module: \(moduleConfig.moduleName)")
             BuildLogger.debug("Dependencies: \(moduleConfig.dependencies ?? [])")
-            
+
             // Add this module to the graph
             dependencyGraph.addModule(moduleConfig.moduleName, dependencies: moduleConfig.dependencies)
-            
+
             // Recursively process all dependencies
             if let dependencies = moduleConfig.dependencies {
                 for dependency in dependencies {
@@ -125,12 +150,12 @@ struct Build: ParsableCommand {
                 }
             }
         }
-        
+
         // Start processing from the root modules in app.yml
         for moduleName in appConfig.modules {
             try processModule(moduleName)
         }
-        
+
         BuildLogger.debug("Complete dependency graph: \(dependencyGraph.adjacencyList)")
         return dependencyGraph
     }

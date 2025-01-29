@@ -33,7 +33,7 @@ final class BuildSystem {
         self.useCache = useCache
     }
 
-    func build() async throws {
+    func buildApp() async throws {
         BuildTimer.reset()
         BuildTimer.start("Total Build")
 
@@ -64,6 +64,37 @@ final class BuildSystem {
         BuildTimer.end("Installation")
 
         BuildTimer.end("Total Build")
+        BuildTimer.summarize()
+    }
+
+    func buildSingleModule(_ moduleName: String) async throws {
+        BuildTimer.reset()
+        BuildTimer.start("Module Build")
+
+        BuildTimer.start("Prepare Directories")
+        try prepareDirectories()
+        BuildTimer.end("Prepare Directories")
+
+        BuildTimer.start("Dependency Resolution")
+        let dependencies = dependencyGraph.resolveDependencies(for: moduleName)
+        // Remove the target module from dependencies as we'll build it last
+        let moduleDependencies = dependencies.filter { $0 != moduleName }
+        BuildLogger.debug("Dependencies for \(moduleName): \(moduleDependencies)")
+        BuildTimer.end("Dependency Resolution")
+
+        BuildTimer.start("Dependencies Compilation")
+        for dependency in moduleDependencies {
+            BuildTimer.start("Dependency: \(dependency)")
+            try await buildModule(dependency)
+            BuildTimer.end("Dependency: \(dependency)")
+        }
+        BuildTimer.end("Dependencies Compilation")
+
+        BuildTimer.start("Target Module")
+        try await buildModule(moduleName)
+        BuildTimer.end("Target Module")
+
+        BuildTimer.end("Module Build")
         BuildTimer.summarize()
     }
 
@@ -270,7 +301,7 @@ extension BuildSystem {
             compilerArgs: args
         )
 
-        if cache.hasCachedModule(key: key) && useCache {
+        if cache.hasCachedModule(key: key), useCache {
             BuildLogger.info("Using cached version of module \(moduleName)")
             try cache.restoreModule(key: key, buildDir: absoluteBuildDir)
             return
