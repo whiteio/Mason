@@ -42,7 +42,7 @@ final class BuildLogger {
         }
         
         // Also log to console if enabled
-        if shouldLogToConsole {
+        if shouldLogToConsole && level == .debug || !shouldLogToConsole && level != .debug {
             let timestamp = ISO8601DateFormatter().string(from: Date())
             print("\(timestamp) \(prefix) \(message)")
         }

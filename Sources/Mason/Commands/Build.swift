@@ -41,8 +41,8 @@ struct Build: ParsableCommand {
                 BuildLogger.debug("Target directory: \(target)")
 
                 let appConfig = try parseAppConfig()
-                print("App Name: \(appConfig.appName)")
-                print("Modules: \(appConfig.modules)")
+                BuildLogger.debug("App Name: \(appConfig.appName)")
+                BuildLogger.debug("Modules: \(appConfig.modules)")
 
                 let dependencyGraph = try buildDependencyGraph(appConfig: appConfig)
                 

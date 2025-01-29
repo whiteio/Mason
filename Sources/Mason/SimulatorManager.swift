@@ -27,12 +27,12 @@ class SimulatorManager {
     }
     
     private func terminateApp(_ bundleId: String) throws {
-        print("Terminating any existing instances of \(bundleId)...")
+        BuildLogger.debug("Terminating any existing instances of \(bundleId)...")
         let (status, output) = try runSimCtlCommand(["terminate", "booted", bundleId])
         
         // Status 146 means app wasn't running, which is fine
         if status != 0 && status != 146 {
-            print("Warning: Failed to terminate app: \(output)")
+            BuildLogger.warning("Warning: Failed to terminate app: \(output)")
         }
     }
     
@@ -41,7 +41,7 @@ class SimulatorManager {
         try terminateApp(config.bundleId)
         
         // Install app
-        print("Installing \(config.appName).app...")
+        BuildLogger.debug("Installing \(config.appName).app...")
         let (installStatus, installOutput) = try runSimCtlCommand([
             "install",
             "booted",
@@ -52,10 +52,10 @@ class SimulatorManager {
             throw BuildError.installationFailed("Failed to install app: \(installOutput)")
         }
         
-        print("Successfully installed app to simulator")
+        BuildLogger.debug("Successfully installed app to simulator")
         
         // Launch app
-        print("Launching \(config.bundleId)...")
+        BuildLogger.info("Launching \(config.bundleId)...")
         let (launchStatus, launchOutput) = try runSimCtlCommand([
             "launch",
             "booted",
@@ -66,6 +66,6 @@ class SimulatorManager {
             throw BuildError.launchFailed("Failed to launch app: \(launchOutput)")
         }
         
-        print("Successfully launched app in simulator")
+        BuildLogger.info("Successfully launched app in simulator")
     }
 }

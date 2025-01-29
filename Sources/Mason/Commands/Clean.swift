@@ -41,12 +41,12 @@ struct Clean: ParsableCommand {
             if fileManager.fileExists(atPath: dir) {
                 do {
                     try fileManager.removeItem(atPath: dir)
-                    print("Removed \(dir)")
+                    BuildLogger.debug("Removed \(dir)")
                 } catch {
-                    print("Failed to remove \(dir): \(error.localizedDescription)")
+                    BuildLogger.debug("Failed to remove \(dir): \(error.localizedDescription)")
                 }
             } else {
-                print("Directory already clean: \(dir)")
+                BuildLogger.debug("Directory already clean: \(dir)")
             }
         }
         
@@ -59,16 +59,16 @@ struct Clean: ParsableCommand {
                         if item.hasSuffix(".swiftmodule") || item.hasSuffix(".o") {
                             let itemPath = "\(modulePath)/\(item)"
                             try fileManager.removeItem(atPath: itemPath)
-                            print("Removed \(itemPath)")
+                            BuildLogger.debug("Removed \(itemPath)")
                         }
                     }
                 } catch {
-                    print("Failed to clean module directory \(modulePath): \(error.localizedDescription)")
+                    BuildLogger.error("Failed to clean module directory \(modulePath): \(error.localizedDescription)")
                 }
             }
         }
         
-        print("Clean completed")
+        BuildLogger.info("Clean completed")
     }
     
     private func parseAppConfig() throws -> AppConfig {

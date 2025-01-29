@@ -339,8 +339,8 @@ extension BuildSystem {
         process.standardOutput = pipe
         process.arguments = args
         
-        BuildLogger.info("Compiling and linking with arguments: \(args.joined(separator: " "))")
-        
+        BuildLogger.debug("Compiling and linking with arguments: \(args.joined(separator: " "))")
+        BuildLogger.info("Compiling \(config.appName)")
         try process.run()
         process.waitUntilExit()
         
