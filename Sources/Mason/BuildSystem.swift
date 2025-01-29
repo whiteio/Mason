@@ -13,6 +13,10 @@ final class BuildSystem {
     private let fileManager: FileManager
     private let simulatorManager: SimulatorManager
     private let dependencyGraph: DependencyGraph
+    
+    private var moduleCache: ModuleCache {
+            ModuleCache(cacheDir: "\(config.buildDir)/../.cache", fileManager: fileManager)
+        }
 
     init(
         config: BuildConfig,
@@ -234,6 +238,7 @@ extension BuildSystem {
         // Set the current directory to the build path
         process.currentDirectoryURL = URL(fileURLWithPath: moduleBuildPath)
 
+        let cache = ModuleCache(cacheDir: "\(config.buildDir)/../.cache", fileManager: fileManager)
         var args = [
             "-sdk", config.sdkPath,
             "-target", "\(config.simulatorArch)-apple-ios\(config.deploymentTarget)-simulator",
@@ -253,6 +258,19 @@ extension BuildSystem {
         let dependencies = dependencyGraph.adjacencyList[moduleName] ?? []
         for dependency in dependencies {
             args += ["-I", "\(absoluteBuildDir)/\(dependency)"]
+        }
+        
+        let key = try cache.computeModuleKey(
+            name: moduleName,
+            sourceFiles: sources,
+            dependencies: [:],
+            compilerArgs: args
+        )
+        
+        if cache.hasCachedModule(key: key) {
+            BuildLogger.info("Using cached version of module \(moduleName)")
+            try cache.restoreModule(key: key, buildDir: absoluteBuildDir)
+            return
         }
 
         args += sources
@@ -276,6 +294,19 @@ extension BuildSystem {
         if process.terminationStatus != 0 {
             throw BuildError.compilationFailed("Failed to build module \(moduleName)")
         }
+        
+        try cache.cacheModule(
+            key: key,
+            buildDir: absoluteBuildDir,
+            artifacts: [
+                "\(moduleName)/\(moduleName).d",
+                "\(moduleName)/\(moduleName).h",
+                "\(moduleName)/\(moduleName).swiftmodule",
+                "\(moduleName)/\(moduleName).emit-module.d",
+                "\(moduleName)/\(moduleName).o",
+                "\(moduleName)/module.swiftdeps"
+            ]
+        )
     }
 
     private func createOutputFileMap(sources: [String], buildPath: String) throws -> String {
