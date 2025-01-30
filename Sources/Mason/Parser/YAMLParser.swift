@@ -18,30 +18,32 @@ struct AppConfig: Codable {
   let swiftVersion: String
   let modules: [String]
   let plist: PlistConfig
-  
+
   enum CodingKeys: String, CodingKey {
-      case appName = "app-name"
-      case bundleId = "bundle-id"
-      case sourceDir = "source-dir"
-      case resourcesDir = "resources-dir"
-      case deploymentTarget = "deployment-target"
-      case modules
-      case swiftVersion = "swift-version"
+    case appName = "app-name"
+    case bundleId = "bundle-id"
+    case sourceDir = "source-dir"
+    case resourcesDir = "resources-dir"
+    case deploymentTarget = "deployment-target"
+    case modules
+    case swiftVersion = "swift-version"
     case plist
   }
 }
 
+// MARK: - PlistConfig
+
 struct PlistConfig: Codable {
-        var version: String
-        var buildNumber: String
-        var infoPlist: InfoPlistConfig
-        
-        enum CodingKeys: String, CodingKey {
-            case version
-            case buildNumber = "build-number"
-            case infoPlist = "info-plist"
-        }
-    }
+  var version: String
+  var buildNumber: String
+  var infoPlist: InfoPlistConfig
+
+  enum CodingKeys: String, CodingKey {
+    case version
+    case buildNumber = "build-number"
+    case infoPlist = "info-plist"
+  }
+}
 
 // MARK: - ModuleConfig
 
@@ -50,7 +52,7 @@ struct ModuleConfig: Codable {
   let dependencies: [String]?
   let sourceDir: String
   let resourcesDir: String
-  
+
   enum CodingKeys: String, CodingKey {
     case moduleName = "module-name"
     case dependencies

@@ -6,11 +6,6 @@ import Foundation
 /// Manages caching of built modules to enable incremental builds
 final class ModuleCache {
 
-  // MARK: Private
-
-  private let fileManager: FileManager
-  private let cacheDir: String
-  
   // MARK: Lifecycle
 
   init(cacheDir: String, fileManager: FileManager = .default) {
@@ -199,6 +194,12 @@ final class ModuleCache {
       }
     }
   }
+
+  // MARK: Private
+
+  private let fileManager: FileManager
+  private let cacheDir: String
+
 }
 
 // MARK: - SHA256Legacy

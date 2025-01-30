@@ -6,15 +6,15 @@
 //
 
 struct InfoPlistConfig: Codable {
-    var customEntries: [String: PlistValue]
-    var supportedOrientations: [String]
-    var requiredDeviceCapabilities: [String]
-    var launchScreen: Bool
-    
-    enum CodingKeys: String, CodingKey {
-        case customEntries = "custom-entries"
-        case supportedOrientations = "supported-orientations"
-        case requiredDeviceCapabilities = "required-device-capabilities"
-        case launchScreen = "launch-screen"
-    }
+  var customEntries: [String: PlistValue]
+  var supportedOrientations: [String]
+  var requiredDeviceCapabilities: [String]
+  var launchScreen: Bool
+
+  enum CodingKeys: String, CodingKey {
+    case customEntries = "custom-entries"
+    case supportedOrientations = "supported-orientations"
+    case requiredDeviceCapabilities = "required-device-capabilities"
+    case launchScreen = "launch-screen"
+  }
 }
