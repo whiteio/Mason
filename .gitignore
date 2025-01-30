@@ -5,3 +5,5 @@ xcuserdata/
 DerivedData/
 .netrc
 .swiftpm
+Example0/.build
+Example0/.cache

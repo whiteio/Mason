@@ -70,6 +70,7 @@ struct Build: ParsableCommand {
         BuildLogger.debug("Modules: \(appConfig.modules)")
 
         let dependencyGraph = try buildDependencyGraph(appConfig: appConfig)
+        try dependencyGraph.validateGraph()
 
         if let moduleName = module {
           // Verify module exists in dependency graph

@@ -39,7 +39,7 @@ final class BuildSystem {
     await BuildTimer.end("Prepare Directories")
 
     await BuildTimer.start("Module Compilation")
-    let buildOrder = resolveBuildOrder()
+    let buildOrder = try resolveBuildOrder()
     try await buildModulesInParallel(Array(buildOrder))
     await BuildTimer.end("Module Compilation")
 
@@ -69,7 +69,7 @@ final class BuildSystem {
     await BuildTimer.end("Prepare Directories")
 
     await BuildTimer.start("Dependency Resolution")
-    let dependencies = dependencyGraph.resolveDependencies(for: moduleName)
+    let dependencies = try dependencyGraph.resolveDependencies(for: moduleName)
     let moduleDependencies = dependencies.filter { $0 != moduleName }
     BuildLogger.debug("Dependencies for \(moduleName): \(moduleDependencies)")
     await BuildTimer.end("Dependency Resolution")
@@ -77,7 +77,7 @@ final class BuildSystem {
     await BuildTimer.start("Dependencies Compilation")
     var modulesByLevel: [Int: Set<String>] = [:]
     for module in moduleDependencies {
-      let deps = dependencyGraph.resolveDependencies(for: module)
+      let deps = try dependencyGraph.resolveDependencies(for: module)
       let level = deps.count
       modulesByLevel[level, default: []].insert(module)
     }
@@ -141,7 +141,7 @@ final class BuildSystem {
     // Group modules by their dependency level
     var modulesByLevel: [Int: Set<String>] = [:]
     for module in modules {
-      let dependencies = dependencyGraph.resolveDependencies(for: module)
+      let dependencies = try dependencyGraph.resolveDependencies(for: module)
       let level = dependencies.count
       modulesByLevel[level, default: []].insert(module)
     }
@@ -188,10 +188,10 @@ final class BuildSystem {
     await tracker.logFinalStatistics()
   }
 
-  private func resolveBuildOrder() -> UniquedSequence<[String], String> {
+  private func resolveBuildOrder() throws -> UniquedSequence<[String], String> {
     var buildOrder: [String] = []
     for moduleName in dependencyGraph.adjacencyList.keys {
-      let dependencies = dependencyGraph.resolveDependencies(for: moduleName)
+      let dependencies = try dependencyGraph.resolveDependencies(for: moduleName)
       buildOrder.append(contentsOf: dependencies)
     }
     return buildOrder.uniqued()
@@ -383,7 +383,7 @@ extension BuildSystem {
       "-Xlinker", "-no_objc_category_merging",
     ]
 
-    let buildOrder = resolveBuildOrder()
+    let buildOrder = try resolveBuildOrder()
     for moduleName in buildOrder {
       args += ["-I", "\(config.buildDir)/\(moduleName)"]
       let objectPath = "\(config.buildDir)/\(moduleName)/\(moduleName).o"
