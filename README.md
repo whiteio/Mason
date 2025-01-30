@@ -1,6 +1,6 @@
 # Mason
 
-A minimal, parallel build system for iOS apps written in Swift.
+A minimal, parallel build system for iOS apps written in Swift. Created as a learning project to explore build systems, Swift concurrency, and parallel compilation.
 
 ## Features
 
@@ -9,7 +9,9 @@ A minimal, parallel build system for iOS apps written in Swift.
 - YAML configuration for projects and modules
 - Real-time build statistics
 
-Currently it only supports the simulator, but I'm hoping to expand upon it since it's pretty basic at the moment.
+I'm hoping to expand upon the features since it's pretty basic at the moment.
+
+**Only iOS simulator is supported**
 
 ## Installation
 
@@ -109,7 +111,3 @@ ProjectRoot/
 ## License
 
 MIT
-
-## Contributing
-
-Pull requests welcome!
