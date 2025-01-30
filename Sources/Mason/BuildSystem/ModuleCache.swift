@@ -5,6 +5,11 @@ import Foundation
 
 /// Manages caching of built modules to enable incremental builds
 final class ModuleCache {
+  
+  // MARK: Private
+
+  private let fileManager: FileManager
+  private let cacheDir: String
 
   // MARK: Lifecycle
 
@@ -174,11 +179,11 @@ final class ModuleCache {
   func cleanCache(olderThan: TimeInterval = 60 * 60 * 24 * 7) throws {
     let contents = try fileManager.contentsOfDirectory(atPath: cacheDir)
     let cutoff = Date().addingTimeInterval(-olderThan)
-
+    
     for item in contents {
       let itemPath = "\(cacheDir)/\(item)"
       let metadataPath = "\(itemPath)/metadata.json"
-
+      
       guard
         let metadata = try? Data(contentsOf: URL(fileURLWithPath: metadataPath)),
         let cached = try? JSONDecoder().decode(CachedModule.self, from: metadata)
@@ -187,19 +192,13 @@ final class ModuleCache {
         try? fileManager.removeItem(atPath: itemPath)
         continue
       }
-
+      
       if cached.timestamp < cutoff {
         try fileManager.removeItem(atPath: itemPath)
         BuildLogger.debug("Removed old cache entry for \(cached.key.name)")
       }
     }
   }
-
-  // MARK: Private
-
-  private let fileManager: FileManager
-  private let cacheDir: String
-
 }
 
 // MARK: - SHA256Legacy

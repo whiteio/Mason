@@ -47,5 +47,4 @@ enum PlistValue: Codable {
     case .dictionary(let dict): try container.encode(dict)
     }
   }
-
 }

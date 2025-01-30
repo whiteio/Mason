@@ -73,5 +73,4 @@ enum BuildLogger {
       print("\(timestamp) \(prefix) \(message)")
     }
   }
-
 }

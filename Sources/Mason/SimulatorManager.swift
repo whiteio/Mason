@@ -73,5 +73,4 @@ class SimulatorManager {
       BuildLogger.warning("Warning: Failed to terminate app: \(output)")
     }
   }
-
 }

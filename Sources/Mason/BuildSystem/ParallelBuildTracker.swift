@@ -8,6 +8,12 @@
 import Foundation
 
 actor ParallelBuildTracker {
+  
+  // MARK: Private
+
+  private var currentlyBuilding: Set<String> = []
+  private var maxConcurrent = 0
+  private var buildTimes: [String: (start: TimeInterval, end: TimeInterval)] = [:]
 
   // MARK: Internal
 
@@ -60,11 +66,4 @@ actor ParallelBuildTracker {
   func logFinalStatistics() {
     BuildLogger.info("Build complete!")
   }
-
-  // MARK: Private
-
-  private var currentlyBuilding: Set<String> = []
-  private var maxConcurrent = 0
-  private var buildTimes: [String: (start: TimeInterval, end: TimeInterval)] = [:]
-
 }

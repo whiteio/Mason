@@ -8,6 +8,10 @@
 import Foundation
 
 actor FileOperationActor {
+  
+  // MARK: Private
+
+  private let fileManager: FileManager
 
   // MARK: Lifecycle
 
@@ -50,9 +54,4 @@ actor FileOperationActor {
   func writeFile(_ content: String, toPath path: String) throws {
     try content.write(toFile: path, atomically: true, encoding: .utf8)
   }
-
-  // MARK: Private
-
-  private let fileManager: FileManager
-
 }
