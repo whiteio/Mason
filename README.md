@@ -16,7 +16,7 @@ I'm hoping to expand upon the features since it's pretty basic at the moment.
 ## Installation
 
 ```bash
-git clone [repository-url]
+git clone https://github.com/whiteio/Mason
 cd mason
 swift build -c release
 cp .build/release/mason /usr/local/bin/
