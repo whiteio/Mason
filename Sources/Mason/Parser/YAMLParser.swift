@@ -20,11 +20,11 @@ struct AppConfig: Codable {
   let plist: PlistConfig
   
   enum CodingKeys: String, CodingKey {
-      case appName
-      case bundleId
-      case sourceDir
-      case resourcesDir
-      case deploymentTarget
+      case appName = "app-name"
+      case bundleId = "bundle-id"
+      case sourceDir = "source-dir"
+      case resourcesDir = "resources-dir"
+      case deploymentTarget = "deployment-target"
       case modules
       case swiftVersion = "swift-version"
     case plist
@@ -50,6 +50,13 @@ struct ModuleConfig: Codable {
   let dependencies: [String]?
   let sourceDir: String
   let resourcesDir: String
+  
+  enum CodingKeys: String, CodingKey {
+    case moduleName = "module-name"
+    case dependencies
+    case sourceDir = "source-dir"
+    case resourcesDir = "resources-dir"
+  }
 }
 
 // MARK: - YAMLParser

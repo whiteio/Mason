@@ -1,6 +1,6 @@
-# Mason - A Swift Build System for iOS
+# Mason - Build System for iOS
 
-Mason is a modern, high-performance build system for iOS applications, designed to handle modular applications with sophisticated dependency graphs. It features parallel compilation, intelligent caching, and flexible configuration options.
+A bit of fun, created for learning purposes. 
 
 ## Features
 
