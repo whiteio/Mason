@@ -377,7 +377,7 @@ extension BuildSystem {
       "-framework", "UIKit",
       "-framework", "CoreGraphics",
       "-framework", "CoreServices",
-      "-swift-version", "5",
+      "-swift-version", "\(config.swiftVersion)",
       "-Xlinker", "-no_objc_category_merging",
     ]
 
