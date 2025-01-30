@@ -1,30 +1,17 @@
-# Mason - Build System for iOS
+# Mason
 
-A bit of fun, created for learning purposes. 
+A minimal, parallel build system for iOS apps written in Swift.
 
 ## Features
 
-### Parallel Building
-- Smart dependency graph analysis for optimal build ordering
-- Level-based parallel compilation of independent modules
-- Thread-safe implementation using Swift actors
-- Real-time build statistics and timing information
+- Parallel module compilation with dependency-aware scheduling
+- Incremental builds with hash-based caching
+- YAML configuration for projects and modules
+- Real-time build statistics
 
-### Intelligent Caching
-- Module-level caching for faster incremental builds
-- Hash-based cache invalidation
-- Efficient cache restoration
-- Support for clean builds when needed
+Currently it only supports the simulator, but I'm hoping to expand upon it since it's pretty basic at the moment.
 
-### Flexible Configuration
-- YAML-based project configuration
-- Customizable Swift version per project
-- Configurable Info.plist management
-- Module dependency specification
-
-## Getting Started
-
-### Installation
+## Installation
 
 ```bash
 git clone [repository-url]
@@ -33,21 +20,21 @@ swift build -c release
 cp .build/release/mason /usr/local/bin/
 ```
 
-### Project Configuration
+## Configuration
 
-Create an `app.yml` file in your project root:
+See the example in `Example0/`
+
+### Project Configuration (app.yml)
 
 ```yaml
-app-name: YourApp
-bundle-id: com.example.yourapp
+app-name: Example0
+bundle-id: com.example.example0
 source-dir: Sources
 resources-dir: Resources
-deployment-target: "15.0"
-swift-version: "5.9"  # Optional, defaults to "5"
+deployment-target: 15.0
+swift-version: 6
 modules:
   - ModuleA
-  - ModuleB
-
 plist:
   version: "1.0.0"
   build-number: "1"
@@ -62,107 +49,67 @@ plist:
       UIViewControllerBasedStatusBarAppearance: false
 ```
 
-### Module Configuration
-
-For each module, create a `module.yml` file:
+### Module Configuration (module.yml)
 
 ```yaml
 module-name: ModuleA
+type: library
 dependencies:
   - ModuleB
   - ModuleC
-source-dir: Sources
-resources-dir: Resources
+  - ModuleD
+source-dir: ModuleA/Sources
+resources-dir: ModuleA/Resources
 ```
 
-### Usage
+## Usage
 
-Build the entire app:
+Build project:
 ```bash
-mason build --source /path/to/your/project
+mason build --source /path/to/project
 ```
 
-Build a specific module:
+E.g.
 ```bash
-mason build --source /path/to/your/project --module ModuleA
+mason build --source Example0
+```
+
+Build single module:
+```bash
+mason build --source /path/to/project --module ModuleA
 ```
 
 Clean build:
 ```bash
-mason build --source /path/to/your/project --clean
+mason build --source /path/to/project --clean
 ```
 
 ## Project Structure
 
 ```
-YourApp/
+ProjectRoot/
 ├── app.yml
 ├── Sources/
-│   ├── AppDelegate.swift
-│   └── SceneDelegate.swift
+│   └── App/
 ├── ModuleA/
 │   ├── module.yml
 │   └── Sources/
-│       └── ModuleACode.swift
 └── ModuleB/
     ├── module.yml
     └── Sources/
-        └── ModuleBCode.swift
-```
-
-## Build Process
-
-1. **Configuration Loading**
-   - Parse YAML configuration files
-   - Validate project structure
-   - Resolve module dependencies
-
-2. **Dependency Analysis**
-   - Build dependency graph
-   - Determine optimal build order
-   - Group modules by dependency level
-
-3. **Parallel Building**
-   - Build independent modules concurrently
-   - Respect dependency ordering
-   - Track build progress and timing
-
-4. **Caching**
-   - Calculate module hashes
-   - Cache build artifacts
-   - Restore cached modules when possible
-
-5. **Final Steps**
-   - Link modules
-   - Generate final executable
-   - Install to simulator
-   - Launch application
-
-## Performance
-
-Mason utilizes parallel building to significantly reduce build times:
-
-- Modules at the same dependency level build concurrently
-- Build time statistics track parallelization benefits
-- Cache system reduces unnecessary recompilation
-
-Example timing output:
-```
-Level 1 build statistics:
-- Modules built: 7
-- Maximum concurrent builds: 7
-- Average build time: 2.28s
-- Total wall clock time: 2.34s
-- Time saved via parallelization: 13.63s
 ```
 
 ## Requirements
 
-- Xcode 14.0+
-- Swift 5.5+
+- Xcode 15.0+
+- Swift 5.9+
 - iOS 15.0+ deployment target
-- macOS 12.0+ for development
+- macOS 13.0+ for development
 
-## Credits
+## License
 
-Created by Chris White
+MIT
+
+## Contributing
+
+Pull requests welcome!

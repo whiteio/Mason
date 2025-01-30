@@ -5,7 +5,6 @@
 //  Created by Chris White on 1/29/25.
 //
 
-
 struct InfoPlistConfig: Codable {
     var customEntries: [String: PlistValue]
     var supportedOrientations: [String]

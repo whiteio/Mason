@@ -1,0 +1,8 @@
+module-name: ModuleA
+type: library
+dependencies:
+  - ModuleB
+  - ModuleC
+  - ModuleD
+source-dir: ModuleA/Sources
+resources-dir: ModuleA/Resources

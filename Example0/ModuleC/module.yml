@@ -1,0 +1,5 @@
+module-name: ModuleC
+type: library
+dependencies: []
+source-dir: ModuleC/Sources
+resources-dir: ModuleC/Resources

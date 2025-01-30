@@ -1,0 +1,5 @@
+module-name: ModuleH
+type: library
+dependencies: []
+source-dir: ModuleH/Sources
+resources-dir: ModuleH/Resources

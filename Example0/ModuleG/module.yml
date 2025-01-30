@@ -1,0 +1,5 @@
+module-name: ModuleG
+type: library
+dependencies: []
+source-dir: ModuleG/Sources
+resources-dir: ModuleG/Resources
