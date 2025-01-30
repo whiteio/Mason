@@ -189,12 +189,10 @@ final class BuildSystem {
   }
 
   private func resolveBuildOrder() throws -> UniquedSequence<[String], String> {
-    var buildOrder: [String] = []
-    for moduleName in dependencyGraph.adjacencyList.keys {
-      let dependencies = try dependencyGraph.resolveDependencies(for: moduleName)
-      buildOrder.append(contentsOf: dependencies)
-    }
-    return buildOrder.uniqued()
+    try dependencyGraph.adjacencyList.keys
+          .map { try dependencyGraph.resolveDependencies(for: $0) }
+          .reduce([], +)
+          .uniqued()
   }
 
   private func prepareDirectories() throws {
